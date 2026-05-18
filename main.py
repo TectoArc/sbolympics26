@@ -2,7 +2,6 @@
 Portal for students' sports registration SB Olympics 2026
 '''
 import streamlit as st
-import pandas as pd
 import gspread
 from google.oauth2.service_account import Credentials
 
@@ -10,9 +9,13 @@ scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-creds = Credentials.from_service_account_file(
-    "service.json",
-    scopes=scope)
+creds = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"],
+    scopes=scope
+)
+# creds = Credentials.from_service_account_file(
+#     "service.json",
+#     scopes=scope)
 
 client = gspread.authorize(creds)
 
@@ -53,6 +56,9 @@ def signup_():
             st.session_state["logged in"] = True
             st.session_state["username"] = username
             st.session_state["registered_sports"] = []
+            st.session_state["department"] = Department
+            st.session_state["selected_sport"] = None
+            st.session_state["paired_person"] = False
             st.switch_page("pages/SportsRegister.py")
 
 def LinktoGSheets(username, Department):

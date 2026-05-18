@@ -1,6 +1,7 @@
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
+import pandas as pd
 
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
@@ -19,6 +20,7 @@ SPORT = ["Table Tennis (Ping Pong)", "Football", "Basketball", "Volleyball", "Bi
 def selectsports():
     logged_in = st.session_state["logged in"] 
     username = st.session_state["username"]
+    department = st.session_state["department"]
     headers = worksheet.row_values(1) # get the list of all headers - includes sports
     # check whether the user is logged in 
     if not logged_in :
@@ -73,10 +75,84 @@ def selectsports():
                         st.session_state["registered_sports"].remove(rs)
                         found = True
                         break
-
                 if found:
                     st.rerun()
                 else:
                     st.error("Record not found")
+    _TeamUP(worksheet, client.open("SBOLYMPICS2026"), username, department)
+    return 
+
+def _TeamUP(sheet, sheet2, username, department):
+    paired_sheet = sheet2.worksheet("Paired_Sports")
+    sports_to_pair = ["Billiards (Pool)", "Table Tennis (Ping Pong)"]
+    records = sheet.get_all_records()
+    all_sports = list(records[0].keys())
+    st.title("Pairing")
+    selected_sport = st.selectbox("Choose sport and player to team up with", options=sports_to_pair, index=None, placeholder="select sport - ")
+    if selected_sport != st.session_state["selected_sport"]:
+        st.session_state["selected_sport"] = selected_sport
+        st.session_state["paired_person"] = False
+        # st.rerun()
+
+    if selected_sport in all_sports and st.session_state["paired_person"] == False:
+        get_player_info = paired_sheet.get_all_records() # check whether player is already registered
+        flag_paired = None
+        target_row = None
+        for idx, row in enumerate(get_player_info):
+            if row["SPORTS"] == selected_sport and row["PLAYER1"] == username:
+                # st.info(f"You are already paired with {row['PLAYER2']} for {selected_sport}")
+                flag_paired = row
+                target_row = idx + 2
+                break
+            elif row["SPORTS"] == selected_sport and row["PLAYER2"] == username:
+                # st.info(f"You are already paired with {row['PLAYER1']} for {selected_sport}")
+                flag_paired = row
+                target_row = idx + 2
+                break
+       
+        if flag_paired:
+            partner = [
+                {"sport":selected_sport, "Partner Name": flag_paired["PLAYER2"], "Partner Department": flag_paired["DEPARTMENT2"], "Action": "❌ Click to De-pair"}]
+            edited = st.data_editor(partner, disabled=["sport", "Partner Name", "Partner Department"], hide_index=True, use_container_width=True, key=f"{selected_sport}_paired", 
+                           column_config={"Action":st.column_config.SelectboxColumn("Options", options=["❌ Click to De-pair", "Confirm De-pair"], required=True,)})
+            
+            editor_state = st.session_state.get(f"{selected_sport}_paired", {})
+            edited_rows = editor_state.get("edited_rows", {})
+            if edited_rows:
+                for row_id, changes in edited_rows.items():
+                    if changes.get("Action") == "Confirm De-pair":
+                        paired_sheet.delete_rows(start_index = target_row) # delete the paired row from the sheet
+                        st.toast("Pairing removed successfully!", icon="🗑️")
+                        st.session_state["paired_person"] = False
+                        st.success("You have been de-paired successfully!")
+                # st.rerun()
+                        
+        else:
+            partner = [
+                {"Pair": False, "Name": str(row["NAME"]).strip(), "Department": str(row["DEPARTMENT"]).strip()}
+                for row in records 
+                if selected_sport in row and str(row[selected_sport]).strip() != ""
+            ]
+            df = st.data_editor(pd.DataFrame(partner), hide_index=True, disabled=["Name", "Department"], use_container_width=True, key=f"{selected_sport}")
+            for idx, row in df.iterrows():
+                if row["Pair"]:  # The user clicked the checkbox
+                    selected_partner_name = row["Name"]
+                    selected_partner_dept = row["Department"]
+                    
+                    # Append to your Google Sheet
+                    paired_sheet.append_row([
+                        selected_sport, 
+                        username,  
+                        department, 
+                        selected_partner_name, 
+                        selected_partner_dept
+                    ])
+                    
+                    # Save state to hide table, toast a success message, and refresh
+                    st.session_state.paired_done = True
+                    st.toast(f"Successfully paired with {selected_partner_name}!", icon="✅")
+                    st.rerun()
+                    break 
+ 
 if __name__ == "__main__":
     selectsports()
