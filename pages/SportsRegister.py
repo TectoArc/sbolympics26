@@ -3,6 +3,7 @@ import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
 from main import create_lock
+import time 
 
 
 global_lock = create_lock()  # Initialize the lock in session state
@@ -57,6 +58,7 @@ def selectsports():
             lock_access = global_lock.acquire(timeout=0)
             if not lock_access:
                 st.warning("Other players are also registering. Please wait while we process your registration...")
+                time.sleep(20)
                 global_lock.acquire(blocking=True)
 
             try:
@@ -79,7 +81,7 @@ def selectsports():
                             vals = "1" if s in sports else ""
                             cell_updates.append({
                                 "range": gspread.utils.rowcol_to_a1(target_idx, header_map[s]),
-                                "values": [[1]]
+                                "values": [vals]
                             })
                         # if s in headers:
                             # worksheet.update_cell(idx, s_header_index, 1)
