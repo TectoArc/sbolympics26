@@ -2,13 +2,16 @@ import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
 import pandas as pd
+from main import create_lock
 
+
+global_lock = create_lock()  # Initialize the lock in session state
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
-creds = Credentials.from_service_account_file(
-    "service.json",
+creds = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"],
     scopes=scope)
 
 client = gspread.authorize(creds)
@@ -33,26 +36,42 @@ def selectsports():
     # if 'registered_sports' not in st.session_state:
     #     st.session_state['registered_sports'] = []
     with st.form("Register"):
-        st.write("If you register for any events you are gay. Period !")
-        
+        st.markdown(
+        """
+        <style>
+        .stMultiSelect div[role="listbox"] {
+            max-height: 100px; /* Adjust this height as needed */
+            overflow-y: auto !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True
+        )
         sports = st.multiselect(label="Which event would you like to participate in ?", options=SPORT, 
                     placeholder="Being an audiance is not sociable ! Select at least one", 
                     default=st.session_state['registered_sports'])
         register = st.form_submit_button("Register")
         if register:
-            records = worksheet.get_all_records()
-            for idx, row in enumerate(records, start=2):
-                if row["NAME"].strip().lower() == username.strip().lower():
-                    for s in sports:
-                        s_header_index = headers.index(s) + 1
-                        if s in headers:
-                            worksheet.update_cell(idx, s_header_index, 1)
-                        else:
-                            worksheet.update_cell(idx, s_header_index, 0)
-                        st.success(f" {username} registered for {s} successfully!")
+            lock_access = global_lock.acquire(timeout=0)
+            if not lock_access:
+                st.warning("Other players are also registering. Please wait while we process your registration...")
+                global_lock.acquire(blocking=True)
+
+            try:
+                records = worksheet.get_all_records()
+                for idx, row in enumerate(records, start=2):
+                    if row["NAME"].strip().lower() == username.strip().lower():
+                        for s in sports:
+                            s_header_index = headers.index(s) + 1
+                            if s in headers:
+                                worksheet.update_cell(idx, s_header_index, 1)
+                            else:
+                                worksheet.update_cell(idx, s_header_index, 0)
+                            st.success(f" {username} registered for {s} successfully!")
                     # sports_str = ", ".join(sports)
                     # worksheet.update_cell(idx, row[], sports_str)
-
+            finally:
+                global_lock.release()
     if sports not in st.session_state['registered_sports']:
         st.session_state['registered_sports'] = sports
 
