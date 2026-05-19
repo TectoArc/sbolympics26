@@ -48,7 +48,7 @@ def main():
 def signup_():
     st.title("Player Registration")
     with st.form("Sign Up for SBO26"):
-        username = st.text_input("Name")
+        username = st.text_input("Full Name")
         Department = st.selectbox("Department", ("Swiss", "Water", "Agriculture"), index=None, placeholder=None)
         global_lock = create_lock()  # Initialize the lock in session state
 
