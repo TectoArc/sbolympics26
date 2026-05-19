@@ -81,7 +81,7 @@ def selectsports():
                             vals = "1" if s in sports else ""
                             cell_updates.append({
                                 "range": gspread.utils.rowcol_to_a1(target_idx, header_map[s]),
-                                "values": [vals]
+                                "values": [[vals]]
                             })
                         # if s in headers:
                             # worksheet.update_cell(idx, s_header_index, 1)
