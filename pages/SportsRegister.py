@@ -58,7 +58,7 @@ def selectsports():
             lock_access = global_lock.acquire(timeout=0)
             if not lock_access:
                 st.warning("Other players are also registering. Please wait while we process your registration...")
-                time.sleep(20)
+                time.sleep(15)
                 global_lock.acquire(blocking=True)
 
             try:
@@ -107,7 +107,7 @@ def selectsports():
 
     # if register:
     st.title("Registered Sports", text_alignment='center')
-    st.markdown("For notifications and updates regarding the event, join - (https://chat.whatsapp.com/IS0CcWRTOdr9u65IUsWhcE)")
+    st.markdown("For notifications and updates regarding the event, join - (https://chat.whatsapp.com/CNE6qtOU5CPAyB3rvumJaQ)")
     records = worksheet.get_all_records()
     player_exists = False
     player_idx = None
