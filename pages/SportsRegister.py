@@ -16,12 +16,7 @@ except st.errors.StreamlitAPIException:
 
 SPREADSHEET_NAME = "SBOLYMPICS2026"
 PAIRABLE_SPORTS = ["Billiards (Pool)", "Darts"]
-SPORT_CAPS = {
-    "Billiards (Pool)": 16,
-    "Ping Pong (Table Tennis)": 16,
-    "Sport Sword": 16,
-    "Darts": 16,
-}
+SPORT_CAPS = {}
 SPORT_ALIASES = {
     "Billiards (Pool)": {"Billiards (Pool)", "Billiards", "Pool"},
     "Ping Pong (Table Tennis)": {
