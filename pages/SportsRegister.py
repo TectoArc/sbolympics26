@@ -337,8 +337,8 @@ def _row_has_sport_registration(row, sport):
 
 
 def _contains_sport(sports, sport):
-    sport_keys = _sport_alias_keys(sport)
-    return any(_normalize_sport_name(selected_sport) in sport_keys for selected_sport in sports)
+    sport_key = _normalize_sport_name(sport)
+    return any(_normalize_sport_name(selected_sport) == sport_key for selected_sport in sports)
 
 
 def _find_user_row(records, username):
