@@ -18,7 +18,9 @@ client = gspread.authorize(creds)
 
 worksheet= client.open("SBOLYMPICS2026").sheet1
 
-SPORT = ["Table Tennis (Ping Pong)", "Football", "Basketball", "Volleyball", "Billiards (Pool)"]
+SPORT = ['Sport Sword', "Trivia Night", "Treasure Hunt", "Dodgeball", "Cricket", "Darts", "Football", "Kho Kho",
+                     "Ping Pong (Table Tennis)", "Basketball", "Volleyball", "Billiards (Pool)", "Backgammon", "Chess", "5k run", "100-m sprint",
+                     "Relay Race", "Cake Baking", "Chill Games (Kids and Adults)", "Badminton"]
 
 def selectsports():
     logged_in = st.session_state["logged in"] 
@@ -59,51 +61,95 @@ def selectsports():
 
             try:
                 records = worksheet.get_all_records()
+                cell_updates = []
+                header_map = {header: idx + 1 for idx, header in enumerate(headers)}  # Map header names to their column indices
+                user_found = False
+                target_idx = -1
+                # check whether the user already exsits in the sheet
+
                 for idx, row in enumerate(records, start=2):
                     if row["NAME"].strip().lower() == username.strip().lower():
-                        for s in sports:
-                            s_header_index = headers.index(s) + 1
-                            if s in headers:
-                                worksheet.update_cell(idx, s_header_index, 1)
-                            else:
-                                worksheet.update_cell(idx, s_header_index, 0)
-                            st.success(f" {username} registered for {s} successfully!")
+                        user_found = True
+                        target_idx = idx
+                        break # found the user
+                if user_found:
+                    for s in sports:
+                        # s_header_index = headers.index(s) + 1
+                        if s in header_map:
+                            vals = "1" if s in sports else ""
+                            cell_updates.append({
+                                "range": gspread.utils.rowcol_to_a1(target_idx, header_map[s]),
+                                "values": [[1]]
+                            })
+                        # if s in headers:
+                            # worksheet.update_cell(idx, s_header_index, 1)
+                        st.success(f" {username} registered for {s} successfully!")
                     # sports_str = ", ".join(sports)
+                    worksheet.batch_update(cell_updates)  # Batch update all the cells at once
                     # worksheet.update_cell(idx, row[], sports_str)
+                else:
+                    new_row = {header:"" for header in headers}
+                    new_row["NAME"] = username.strip()
+                    new_row["DEPARTMENT"] = department.strip()
+                    for s in sports:
+                        if s in new_row:
+                            new_row[s] = "1"
+                    new_row_list = [new_row[header] for header in headers]
+                    # Append the new row to the bottom of the sheet
+                    worksheet.append_row(new_row_list)
+                    st.success(f"Successfully created new registration for {username}!")
             finally:
                 global_lock.release()
     if sports not in st.session_state['registered_sports']:
         st.session_state['registered_sports'] = sports
 
-    if register:
-        st.title("Registered Sports", text_alignment='center')
-        st.markdown("For notifications and updates regarding the event, join - (https://chat.whatsapp.com/IS0CcWRTOdr9u65IUsWhcE)")
-    for rs in st.session_state['registered_sports']:
-        c1, c2 = st.columns([0.7, 0.3])
-        with c1:
-            st.markdown(f"**{rs}**")
-        with c2:
-            if st.button(f"Delete", key=f"del_{rs}"):
-                found = False
-                records = worksheet.get_all_records()
-                for idx, row in enumerate(records, start=2):
-                    if row["NAME"].strip().lower() == username.strip().lower():
-                        s_header_index = headers.index(rs) + 1
-                        worksheet.update_cell(idx, s_header_index, "")
-                        st.success(f" {username} de-registered from {rs} successfully!")
-                        st.session_state["registered_sports"].remove(rs)
-                        found = True
-                        break
-                if found:
-                    st.rerun()
-                else:
-                    st.error("Record not found")
+    # if register:
+    st.title("Registered Sports", text_alignment='center')
+    st.markdown("For notifications and updates regarding the event, join - (https://chat.whatsapp.com/IS0CcWRTOdr9u65IUsWhcE)")
+    records = worksheet.get_all_records()
+    player_exists = False
+    player_idx = None
+    for idx, row in enumerate(records, start=2):
+        if row["NAME"].strip().lower() == username.strip().lower():
+            player_exists = True
+            player_idx = idx
+            if len(st.session_state['registered_sports']) == 0:
+                registered = []
+                for h in headers:
+                    if h not in ["NAME", "DEPARTMENT"]:
+                        if str(row[h]).strip() == "1":
+                            registered.append(h)
+                st.session_state['registered_sports'] = registered
+            break
+
+    if player_exists:
+        cell_updates = []
+        for rs in st.session_state['registered_sports']:
+            c1, c2 = st.columns([0.7, 0.3])
+            with c1:
+                st.markdown(f"**{rs}**")
+            with c2:
+                if st.button(f"Delete", key=f"del_{rs}"):
+                    found = False
+                    # records = worksheet.get_all_records()
+                    for idx, row in enumerate(records, start=2):
+                        if row["NAME"].strip().lower() == username.strip().lower():
+                            s_header_index = headers.index(rs) + 1
+                            worksheet.update_cell(idx, s_header_index, "")
+                            st.success(f" {username} de-registered from {rs} successfully!")
+                            st.session_state["registered_sports"].remove(rs)
+                            found = True
+                            break
+                    if found:
+                        st.rerun()
+                    else:
+                        st.error("Record not found")
     _TeamUP(worksheet, client.open("SBOLYMPICS2026"), username, department)
     return 
 
 def _TeamUP(sheet, sheet2, username, department):
     paired_sheet = sheet2.worksheet("Paired_Sports")
-    sports_to_pair = ["Billiards (Pool)", "Table Tennis (Ping Pong)"]
+    sports_to_pair = ["Billiards (Pool)"]
     records = sheet.get_all_records()
     all_sports = list(records[0].keys())
     st.title("Pairing")

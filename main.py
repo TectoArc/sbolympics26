@@ -38,8 +38,10 @@ def SelectSports():
 
 def main():
     st.set_page_config(page_title="WelcomeToSBOLYMPICS2026", layout="wide")
-    
-    st.multiselect(label="Which event would you like to participate in ?", options=["Billiards (Pool)", "Basketball", "Football", "Volleyball", "Table Tennis (Ping Pong)"], 
+    listed_sports = ['Sport Sword', "Trivia Night", "Treasure Hunt", "Dodgeball", "Cricket", "Darts", "Football", "Kho Kho",
+                     "Ping Pong (Table Tennis)", "Basketball", "Volleyball", "Billiards (Pool)", "Backgammon", "Chess", "5k run", "100-m sprint",
+                     "Relay Race", "Cake Baking", "Chill Games (Kids and Adults)", "Badminton"]
+    st.multiselect(label="Which event would you like to participate in ?", options=listed_sports, 
                    placeholder="Being an audiance is not sociable ! Select at least one")
 
 
@@ -64,7 +66,7 @@ def signup_():
                 txt.info("🔄 You can try registering again now!")
 
             try:
-                LinktoGSheets(username, Department)
+                # LinktoGSheets(username, Department)
                 st.session_state["lock_user"] = create_lock()
                 st.session_state["logged in"] = True
                 st.session_state["username"] = username
