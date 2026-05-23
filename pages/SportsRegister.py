@@ -15,7 +15,7 @@ except st.errors.StreamlitAPIException:
 
 
 SPREADSHEET_NAME = "SBOLYMPICS2026"
-PAIRABLE_SPORTS = ["Billiards (Pool)", "Darts"]
+PAIRABLE_SPORTS = ["Billiards (Pool)", "Darts", "Badminton"]
 SPORT_CAPS = {}
 SPORT_ALIASES = {
     "Billiards (Pool)": {"Billiards (Pool)", "Billiards", "Pool"},
@@ -75,6 +75,10 @@ def _normalize_name(name):
     return str(name or "").strip().lower()
 
 
+def _canonical_name(name):
+    return " ".join(_normalize_name(name).split())
+
+
 def _normalize_sport_name(name):
     return "".join(char for char in _normalize_name(name) if char.isalnum())
 
@@ -111,11 +115,20 @@ def _contains_sport(sports, sport):
 
 
 def _find_user_row(records, username):
-    username_key = _normalize_name(username)
+    username_key = _canonical_name(username)
     for row_number, row in enumerate(records, start=2):
-        if _normalize_name(row.get("NAME")) == username_key:
+        if _canonical_name(row.get("NAME")) == username_key:
             return row_number, row
     return None, None
+
+
+def _find_user_rows(records, username):
+    username_key = _canonical_name(username)
+    return [
+        (row_number, row)
+        for row_number, row in enumerate(records, start=2)
+        if _canonical_name(row.get("NAME")) == username_key
+    ]
 
 
 def _registered_sports_from_row(row, headers):
@@ -220,7 +233,8 @@ def _save_registration(worksheet, username, department, selected_sports):
     headers = _sheet_headers(worksheet)
     records = worksheet.get_all_records()
     header_map = {header: idx + 1 for idx, header in enumerate(headers)}
-    row_number, user_row = _find_user_row(records, username)
+    user_rows = _find_user_rows(records, username)
+    row_number, user_row = user_rows[0] if user_rows else (None, None)
     current_registered_sports = _registered_sports_from_row(user_row, headers)
     selected_sports, capped_sports = _filter_capped_sports(
         records,
@@ -236,14 +250,28 @@ def _save_registration(worksheet, username, department, selected_sports):
 
     if row_number:
         cell_updates = []
-        for sport in SPORT:
-            if sport in header_map:
+        for target_row_number, target_row in user_rows:
+            department_value = str(
+                department or target_row.get("DEPARTMENT") or ""
+            ).strip()
+            if "DEPARTMENT" in header_map and department_value:
                 cell_updates.append(
                     {
-                        "range": gspread.utils.rowcol_to_a1(row_number, header_map[sport]),
-                        "values": [["1" if sport in selected_sports else ""]],
+                        "range": gspread.utils.rowcol_to_a1(
+                            target_row_number,
+                            header_map["DEPARTMENT"],
+                        ),
+                        "values": [[department_value]],
                     }
                 )
+            for sport in SPORT:
+                if sport in header_map:
+                    cell_updates.append(
+                        {
+                            "range": gspread.utils.rowcol_to_a1(target_row_number, header_map[sport]),
+                            "values": [["1" if sport in selected_sports else ""]],
+                        }
+                    )
 
         if cell_updates:
             worksheet.batch_update(cell_updates)
@@ -251,7 +279,7 @@ def _save_registration(worksheet, username, department, selected_sports):
     else:
         new_row = {header: "" for header in headers}
         new_row["NAME"] = str(username).strip()
-        new_row["DEPARTMENT"] = str(department).strip()
+        new_row["DEPARTMENT"] = str(department or "").strip()
 
         for sport in selected_sports:
             if sport in new_row:
@@ -270,12 +298,20 @@ def _delete_registration(worksheet, username, sport):
         return
 
     records = worksheet.get_all_records()
-    row_number, _ = _find_user_row(records, username)
-    if not row_number:
+    user_rows = _find_user_rows(records, username)
+    if not user_rows:
         st.error("Record not found.")
         return
 
-    worksheet.update_cell(row_number, headers.index(sport) + 1, "")
+    sport_column = headers.index(sport) + 1
+    cell_updates = [
+        {
+            "range": gspread.utils.rowcol_to_a1(row_number, sport_column),
+            "values": [[""]],
+        }
+        for row_number, _ in user_rows
+    ]
+    worksheet.batch_update(cell_updates)
     st.session_state["registered_sports"] = [
         registered_sport
         for registered_sport in st.session_state["registered_sports"]
@@ -547,6 +583,9 @@ def _MultiTeamUP(sheet, sheet2, username, department):
     # 1. Check current user's registration status
     _, current_user_row = _find_user_row(records, username)
     is_registered = current_user_row and _is_registered_value(current_user_row.get("Trivia Night"))
+    current_user_department = str(
+        (current_user_row or {}).get("DEPARTMENT") or department or ""
+    ).strip()
 
     if not is_registered:
         st.warning("⚠️ You are not registered for Trivia Night yet! Please register in the main tab first.")
@@ -644,7 +683,10 @@ def _MultiTeamUP(sheet, sheet2, username, department):
 
         # The user is always Player 1
         final_players = [username] + selected_names
-        final_depts = [department] + [available_partners[name] for name in selected_names]
+        final_depts = [current_user_department] + [
+            available_partners[name]
+            for name in selected_names
+        ]
 
         row_to_append = final_players + final_depts
 
